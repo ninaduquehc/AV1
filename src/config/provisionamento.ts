@@ -18,9 +18,15 @@ export function provisionar(senhaAdmin: string): void {
     admin: {
       usuario: "admin",
       hashSenha: hashSenha,
+      papel: "administrador",
     },
   };
 
   fs.writeFileSync(CAMINHO_CONFIG, JSON.stringify(configuracao));
   console.log("Provisionamento concluído. Administrador criado com sucesso.");
+}
+
+export function carregarConfiguracao() {
+  const conteudo = fs.readFileSync(CAMINHO_CONFIG, "utf-8");
+  return JSON.parse(conteudo);
 }
