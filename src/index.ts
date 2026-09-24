@@ -6,6 +6,7 @@ import { exibirMenu } from "./commands/menu";
 import { criarUsuario } from "./commands/usuarios";
 import { cadastrarOrganizacao } from "./commands/organizacoes";
 import { registrarLote } from "./commands/lotes";
+import { cadastrarEquipamento, concluirTriagemEquipamento, moverEquipamentoParaDesmonte } from "./commands/equipamentos";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -55,6 +56,26 @@ async function loopMenu(papel: string, configuracao: any) {
       const transportadora = await perguntar("Transportadora: ");
       const dataEntrada = await perguntar("Data de entrada (AAAA-MM-DD): ");
       registrarLote(org, nf, transportadora, dataEntrada);
+      continue;
+    }
+
+    if (escolha === "6" && papel === "gestor_almoxarifado") {
+      const id = await perguntar("ID do equipamento: ");
+      const loteId = await perguntar("ID do lote: ");
+      const estadoFisico = await perguntar("Estado físico (novo/bom/regular/ruim/sucata): ");
+      cadastrarEquipamento(id, loteId, estadoFisico);
+      continue;
+    }
+
+    if (escolha === "7" && papel === "gestor_almoxarifado") {
+      const id = await perguntar("ID do equipamento: ");
+      concluirTriagemEquipamento(id);
+      continue;
+    }
+
+    if (escolha === "8" && papel === "gestor_almoxarifado") {
+      const id = await perguntar("ID do equipamento: ");
+      moverEquipamentoParaDesmonte(id);
       continue;
     }
 
