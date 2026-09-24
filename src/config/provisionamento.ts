@@ -20,6 +20,7 @@ export function provisionar(senhaAdmin: string): void {
       hashSenha: hashSenha,
       papel: "administrador",
     },
+    usuarios: [],
   };
 
   fs.writeFileSync(CAMINHO_CONFIG, JSON.stringify(configuracao));
@@ -29,4 +30,8 @@ export function provisionar(senhaAdmin: string): void {
 export function carregarConfiguracao() {
   const conteudo = fs.readFileSync(CAMINHO_CONFIG, "utf-8");
   return JSON.parse(conteudo);
+}
+
+export function salvarConfiguracao(configuracao: any): void {
+  fs.writeFileSync(CAMINHO_CONFIG, JSON.stringify(configuracao));
 }
