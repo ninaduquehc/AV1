@@ -5,6 +5,7 @@ import { registrarAtividade, sessaoExpirada } from "./auth/sessao";
 import { exibirMenu } from "./commands/menu";
 import { criarUsuario } from "./commands/usuarios";
 import { cadastrarOrganizacao } from "./commands/organizacoes";
+import { registrarLote } from "./commands/lotes";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -45,6 +46,15 @@ async function loopMenu(papel: string, configuracao: any) {
       const cnpj = await perguntar("CNPJ: ");
       const nome = await perguntar("Nome da organização: ");
       cadastrarOrganizacao(cnpj, nome);
+      continue;
+    }
+
+    if (escolha === "4" && papel === "gestor_almoxarifado") {
+      const org = await perguntar("Organização (ID): ");
+      const nf = await perguntar("Nota fiscal: ");
+      const transportadora = await perguntar("Transportadora: ");
+      const dataEntrada = await perguntar("Data de entrada (AAAA-MM-DD): ");
+      registrarLote(org, nf, transportadora, dataEntrada);
       continue;
     }
 
