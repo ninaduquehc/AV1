@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as caminho from "path";
 import { Organizacao } from "../models/organizacao";
 import { criptografar, descriptografar, escreverAtomico } from "../persistence/armazenamento";
+import { registrarTransacao } from "../persistence/journal";
 
 const CAMINHO_ORGANIZACOES = caminho.join(__dirname, "..", "..", "data", "organizacoes.enc");
 
@@ -12,7 +13,7 @@ function carregarOrganizacoes(): Organizacao[] {
   return JSON.parse(conteudo);
 }
 
-export function cadastrarOrganizacao(cnpj: string, nome: string): void {
+export function cadastrarOrganizacao(cnpj: string, nome: string, usuarioLogado: string): void {
   const organizacao = new Organizacao(cnpj, nome);
 
   if (!organizacao.validar()) {
@@ -27,6 +28,8 @@ export function cadastrarOrganizacao(cnpj: string, nome: string): void {
     console.log("Já existe uma organização cadastrada com esse CNPJ.");
     return;
   }
+
+  registrarTransacao(usuarioLogado, "cadastrar_organizacao", { cnpj, nome });
 
   organizacoes.push(organizacao);
   const conteudoCriptografado = criptografar(JSON.stringify(organizacoes));

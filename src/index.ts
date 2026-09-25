@@ -7,6 +7,7 @@ import { criarUsuario } from "./commands/usuarios";
 import { cadastrarOrganizacao } from "./commands/organizacoes";
 import { registrarLote } from "./commands/lotes";
 import { cadastrarEquipamento, concluirTriagemEquipamento, moverEquipamentoParaDesmonte } from "./commands/equipamentos";
+import { exibirHistorico } from "./commands/historico";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -19,7 +20,7 @@ function perguntar(pergunta: string): Promise<string> {
   });
 }
 
-async function loopMenu(papel: string, configuracao: any) {
+async function loopMenu(papel: string, usuarioLogado: string, configuracao: any) {
   while (true) {
     if (sessaoExpirada()) {
       console.log("Sessão expirada por inatividade. Faça login novamente.");
@@ -46,7 +47,7 @@ async function loopMenu(papel: string, configuracao: any) {
     if (escolha === "3" && papel === "operador_cadastro") {
       const cnpj = await perguntar("CNPJ: ");
       const nome = await perguntar("Nome da organização: ");
-      cadastrarOrganizacao(cnpj, nome);
+      cadastrarOrganizacao(cnpj, nome, usuarioLogado);
       continue;
     }
 
@@ -55,27 +56,32 @@ async function loopMenu(papel: string, configuracao: any) {
       const nf = await perguntar("Nota fiscal: ");
       const transportadora = await perguntar("Transportadora: ");
       const dataEntrada = await perguntar("Data de entrada (AAAA-MM-DD): ");
-      registrarLote(org, nf, transportadora, dataEntrada);
+      registrarLote(org, nf, transportadora, dataEntrada, usuarioLogado);
       continue;
     }
+
+    if (escolha === "5" && (papel === "administrador" || papel === "auditor")) {
+      exibirHistorico();
+      continue;
+    } 
 
     if (escolha === "6" && papel === "gestor_almoxarifado") {
       const id = await perguntar("ID do equipamento: ");
       const loteId = await perguntar("ID do lote: ");
       const estadoFisico = await perguntar("Estado físico (novo/bom/regular/ruim/sucata): ");
-      cadastrarEquipamento(id, loteId, estadoFisico);
+      cadastrarEquipamento(id, loteId, estadoFisico, usuarioLogado);
       continue;
     }
 
     if (escolha === "7" && papel === "gestor_almoxarifado") {
       const id = await perguntar("ID do equipamento: ");
-      concluirTriagemEquipamento(id);
+      concluirTriagemEquipamento(id, usuarioLogado);
       continue;
     }
 
     if (escolha === "8" && papel === "gestor_almoxarifado") {
       const id = await perguntar("ID do equipamento: ");
-      moverEquipamentoParaDesmonte(id);
+      moverEquipamentoParaDesmonte(id, usuarioLogado);
       continue;
     }
 
@@ -98,7 +104,7 @@ async function principal() {
     if (resultado.autenticado && resultado.papel) {
       console.log("Login realizado com sucesso.");
       registrarAtividade();
-      await loopMenu(resultado.papel, configuracao);
+      await loopMenu(resultado.papel, usuario, configuracao);
     } else {
       console.log("Usuário ou senha inválidos.");
     }
