@@ -1,40 +1,54 @@
 import * as fs from "fs";
-import * as caminho from "path";
+import * as path from "path";
 import * as crypto from "crypto";
 import { ARQ_CONFIG } from "../config/caminhos";
 
-let chaveEmCache: Buffer | null = null;
-
-function obterChave(): Buffer {
-  if (chaveEmCache) return chaveEmCache;
-  const configuracao = JSON.parse(fs.readFileSync(ARQ_CONFIG, "utf-8"));
-  chaveEmCache = Buffer.from(configuracao.chaveAes, "hex");
-  return chaveEmCache;
+function obterChaveAes(): Buffer {
+  if (!fs.existsSync(ARQ_CONFIG)) {
+    throw new Error("Sistema não provisionado. Configuração mestre não encontrada.");
+  }
+  const config = JSON.parse(fs.readFileSync(ARQ_CONFIG, "utf-8"));
+  return Buffer.from(config.chaveAes, "hex");
 }
 
-// Formato: iv:tag:conteudo (tudo em hexadecimal)
-export function criptografar(dado: string): string {
-  const iv = crypto.randomBytes(12);
-  const cifra = crypto.createCipheriv("aes-256-gcm", obterChave(), iv);
-  const cifrado = Buffer.concat([cifra.update(dado, "utf-8"), cifra.final()]);
-  const tag = cifra.getAuthTag();
-  return [iv, tag, cifrado].map((b) => b.toString("hex")).join(":");
+export function criptografar(dados: string): string {
+  const chave = obterChaveAes();
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv("aes-256-cbc", chave, iv);
+  let encriptado = cipher.update(dados, "utf-8", "hex");
+  encriptado += cipher.final("hex");
+  return `${iv.toString("hex")}:${encriptado}`;
 }
 
-export function descriptografar(dadoCriptografado: string): string {
-  const partes = dadoCriptografado.trim().split(":");
-  if (partes.length !== 3) throw new Error("Formato criptografado inválido.");
-
-  const [iv, tag, cifrado] = partes.map((p) => Buffer.from(p, "hex"));
-  const decifra = crypto.createDecipheriv("aes-256-gcm", obterChave(), iv);
-  decifra.setAuthTag(tag);
-  // final() lança erro se o conteúdo foi alterado
-  return Buffer.concat([decifra.update(cifrado), decifra.final()]).toString("utf-8");
+export function descriptografar(dadosCriptografados: string): string {
+  const chave = obterChaveAes();
+  const [ivHex, conteudoHex] = dadosCriptografados.split(":");
+  if (!ivHex || !conteudoHex) {
+    throw new Error("Estrutura do arquivo criptografado inválida.");
+  }
+  const iv = Buffer.from(ivHex, "hex");
+  const decipher = crypto.createDecipheriv("aes-256-cbc", chave, iv);
+  let decriptado = decipher.update(conteudoHex, "hex", "utf-8");
+  decriptado += decipher.final("utf-8");
+  return decriptado;
 }
 
-export function escreverAtomico(caminhoArquivo: string, conteudo: string): void {
-  fs.mkdirSync(caminho.dirname(caminhoArquivo), { recursive: true });
-  const caminhoTemp = caminhoArquivo + ".tmp";
-  fs.writeFileSync(caminhoTemp, conteudo, { mode: 0o600 });
-  fs.renameSync(caminhoTemp, caminhoArquivo);
+export function escreverAtomico(caminhoArquivo: string, conteudo: string, criptografarConteudo: boolean = false): void {
+  const dir = path.dirname(caminhoArquivo);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const arquivoTmp = `${caminhoArquivo}.tmp_${Date.now()}`;
+  const dadoFinal = criptografarConteudo ? criptografar(conteudo) : conteudo;
+
+  fs.writeFileSync(arquivoTmp, dadoFinal, "utf-8");
+  fs.renameSync(arquivoTmp, caminhoArquivo);
+}
+
+export function lerAtomico(caminhoArquivo: string, criptografado: boolean = false): string | null {
+  if (!fs.existsSync(caminhoArquivo)) return null;
+  const conteudo = fs.readFileSync(caminhoArquivo, "utf-8");
+  if (!conteudo.trim()) return null;
+  return criptografado ? descriptografar(conteudo) : conteudo;
 }
