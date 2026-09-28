@@ -1,11 +1,19 @@
-import { lerJournal } from "../persistence/journal";
+import { lerJournal, verificarIntegridadeJournal } from "../persistence/journal";
+import { log } from "../utils/logger";
 
 export function exibirHistorico(): void {
   const registros = lerJournal();
 
   if (registros.length === 0) {
-    console.log("Nenhum registro encontrado.");
+    log.aviso("Nenhum registro encontrado.");
     return;
+  }
+
+  const invalido = verificarIntegridadeJournal();
+  if (invalido === -1) {
+    log.info("Integridade do journal verificada.");
+  } else {
+    log.erro(`Journal adulterado a partir do registro #${invalido + 1}.`);
   }
 
   console.log("\n--- Histórico de Transações ---");

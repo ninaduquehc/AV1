@@ -1,23 +1,14 @@
-import { gerarHash } from "./senha";
+import { verificarSenha } from "./senha";
+import { buscarCredencial } from "./credenciais";
 
 export function autenticar(
   usuario: string,
-  senha: string,
-  configuracao: any
+  senha: string
 ): { autenticado: boolean; papel: string | null } {
-  const hashDigitado = gerarHash(senha);
+  const credencial = buscarCredencial(usuario);
 
-  if (usuario === configuracao.admin.usuario && hashDigitado === configuracao.admin.hashSenha) {
-    return { autenticado: true, papel: configuracao.admin.papel };
+  if (credencial && verificarSenha(senha, credencial.salt, credencial.hashSenha)) {
+    return { autenticado: true, papel: credencial.papel };
   }
-
-  const encontrado = configuracao.usuarios.find(
-    (u: any) => u.usuario === usuario && u.hashSenha === hashDigitado
-  );
-
-  if (encontrado) {
-    return { autenticado: true, papel: encontrado.papel };
-  }
-
   return { autenticado: false, papel: null };
 }

@@ -1,38 +1,37 @@
-import * as fs from "fs";
-import * as caminho from "path";
 import { Organizacao } from "../models/organizacao";
-import { criptografar, descriptografar, escreverAtomico } from "../persistence/armazenamento";
+import { FabricaEntidades } from "../models/fabrica";
+import { ARQ_ORGANIZACOES } from "../config/caminhos";
+import { Repositorio } from "../persistence/repositorio";
 import { registrarTransacao } from "../persistence/journal";
+import { log } from "../utils/logger";
 
-const CAMINHO_ORGANIZACOES = caminho.join(__dirname, "..", "..", "data", "organizacoes.enc");
+const repositorio = new Repositorio<Organizacao>(ARQ_ORGANIZACOES, Organizacao.deJSON);
 
-function carregarOrganizacoes(): Organizacao[] {
-  if (!fs.existsSync(CAMINHO_ORGANIZACOES)) return [];
-  const conteudoCriptografado = fs.readFileSync(CAMINHO_ORGANIZACOES, "utf-8");
-  const conteudo = descriptografar(conteudoCriptografado);
-  return JSON.parse(conteudo);
+export function carregarOrganizacoes(): Organizacao[] {
+  return repositorio.carregar();
 }
 
 export function cadastrarOrganizacao(cnpj: string, nome: string, usuarioLogado: string): void {
-  const organizacao = new Organizacao(cnpj, nome);
+  const cnpjNumeros = cnpj.replace(/\D/g, ""); // com ou sem pontuação, é o mesmo CNPJ
+  const organizacoes = repositorio.carregar();
+  const organizacao = FabricaEntidades.criarOrganizacao(cnpjNumeros, nome.trim(), organizacoes);
 
-  if (!organizacao.validar()) {
-    console.log("CNPJ inválido. Cadastro não realizado.");
+  const erros = organizacao.errosDeValidacao();
+  if (organizacoes.some((o) => o.cnpj === organizacao.cnpj)) {
+    erros.push("Já existe uma organização cadastrada com esse CNPJ.");
+  }
+  if (erros.length > 0) {
+    erros.forEach((e) => log.erro(e));
     return;
   }
 
-  const organizacoes = carregarOrganizacoes();
-
-  const jaExiste = organizacoes.some((o: any) => o.cnpj === organizacao.cnpj);
-  if (jaExiste) {
-    console.log("Já existe uma organização cadastrada com esse CNPJ.");
-    return;
-  }
-
-  registrarTransacao(usuarioLogado, "cadastrar_organizacao", { cnpj, nome });
+  registrarTransacao(usuarioLogado, "cadastrar_organizacao", {
+    id: organizacao.id,
+    cnpj: cnpjNumeros,
+    nome: organizacao.nome,
+  });
 
   organizacoes.push(organizacao);
-  const conteudoCriptografado = criptografar(JSON.stringify(organizacoes));
-  escreverAtomico(CAMINHO_ORGANIZACOES, conteudoCriptografado);
-  console.log(`Organização "${nome}" cadastrada com sucesso.`);
+  repositorio.salvar(organizacoes);
+  log.sucesso(`Organização "${organizacao.nome}" cadastrada com ID ${organizacao.id}.`);
 }

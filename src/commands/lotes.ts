@@ -1,32 +1,57 @@
-import * as fs from "fs";
-import * as caminho from "path";
 import { Lote } from "../models/lote";
-import { criptografar, descriptografar, escreverAtomico } from "../persistence/armazenamento";
+import { FabricaEntidades } from "../models/fabrica";
+import { ARQ_LOTES } from "../config/caminhos";
+import { Repositorio } from "../persistence/repositorio";
 import { registrarTransacao } from "../persistence/journal";
+import { carregarOrganizacoes } from "./organizacoes";
+import { parseData } from "../utils/datas";
+import { log } from "../utils/logger";
 
-const CAMINHO_LOTES = caminho.join(__dirname, "..", "..", "data", "lotes.enc");
+const repositorio = new Repositorio<Lote>(ARQ_LOTES, Lote.deJSON);
 
-function carregarLotes(): any[] {
-  if (!fs.existsSync(CAMINHO_LOTES)) return [];
-  const conteudoCriptografado = fs.readFileSync(CAMINHO_LOTES, "utf-8");
-  const conteudo = descriptografar(conteudoCriptografado);
-  return JSON.parse(conteudo);
+export function carregarLotes(): Lote[] {
+  return repositorio.carregar();
 }
 
-export function registrarLote(org: string, nf: string, transportadora: string, dataEntradaTexto: string, usuarioLogado: string): void {
-  const dataEntrada = new Date(dataEntradaTexto);
-  const lote = new Lote(org, nf, transportadora, dataEntrada);
+export function registrarLote(
+  orgTexto: string,
+  nf: string,
+  transportadora: string,
+  dataEntradaTexto: string,
+  usuarioLogado: string
+): void {
+  const orgId = orgTexto.trim().toUpperCase();
+  const dataEntrada = parseData(dataEntradaTexto);
 
-  if (!lote.validar()) {
-    console.log("Data de entrada inválida (futura ou anterior a 90 dias). Registro não realizado.");
+  if (!dataEntrada) {
+    log.erro("Data inválida. Use o formato AAAA-MM-DD.");
     return;
   }
 
-  registrarTransacao(usuarioLogado, "registrar_lote", { org, nf, transportadora, dataEntradaTexto });
+  const lotes = repositorio.carregar();
+  const lote = FabricaEntidades.criarLote(orgId, nf.trim(), transportadora.trim(), dataEntrada, lotes);
 
-  const lotes = carregarLotes();
+  const erros = lote.errosDeValidacao();
+  if (!carregarOrganizacoes().some((o) => o.id === orgId)) {
+    erros.push(`Organização "${orgId}" não encontrada.`);
+  }
+  if (lotes.some((l) => l.org === orgId && l.nf === lote.nf)) {
+    erros.push("Já existe um lote com essa nota fiscal para a organização.");
+  }
+  if (erros.length > 0) {
+    erros.forEach((e) => log.erro(e));
+    return;
+  }
+
+  registrarTransacao(usuarioLogado, "registrar_lote", {
+    id: lote.id,
+    org: orgId,
+    nf: lote.nf,
+    transportadora: lote.transportadora,
+    dataEntrada: dataEntradaTexto.trim(),
+  });
+
   lotes.push(lote);
-  const conteudoCriptografado = criptografar(JSON.stringify(lotes));
-  escreverAtomico(CAMINHO_LOTES, conteudoCriptografado);
-  console.log(`Lote da organização "${org}" registrado com sucesso.`);
+  repositorio.salvar(lotes);
+  log.sucesso(`Lote ${lote.id} da organização ${orgId} registrado.`);
 }

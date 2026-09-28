@@ -1,26 +1,42 @@
-import { Validavel } from "./validavel";
+import { Entidade } from "./entidade";
 
-export class Lote {
-  org: string;
-  nf: string;
-  transportadora: string;
-  dataEntrada: Date;
+const DIAS_MAXIMOS_RETROATIVOS = 90;
 
-  constructor(org: string, nf: string, transportadora: string, dataEntrada: Date) {
-    this.org = org;
-    this.nf = nf;
-    this.transportadora = transportadora;
-    this.dataEntrada = dataEntrada;
+export class Lote extends Entidade {
+  constructor(
+    public readonly id: string,
+    public org: string,
+    public nf: string,
+    public transportadora: string,
+    public dataEntrada: Date
+  ) {
+    super();
   }
 
-  validar(): boolean {
-    const agora = Date.now();
+  protected regras(): string[] {
+    const erros: string[] = [];
+    if (!this.org) erros.push("Organização é obrigatória.");
+    if (!this.nf) erros.push("Nota fiscal é obrigatória.");
+    if (!this.transportadora) erros.push("Transportadora é obrigatória.");
+
     const dataMs = this.dataEntrada.getTime();
-    const noventaDiasMs = 90 * 24 * 60 * 60 * 1000;
+    if (isNaN(dataMs)) {
+      erros.push("Data de entrada inválida.");
+    } else {
+      const agora = Date.now();
+      if (dataMs > agora) erros.push("Data de entrada não pode ser futura.");
+      if (agora - dataMs > DIAS_MAXIMOS_RETROATIVOS * 24 * 60 * 60 * 1000) {
+        erros.push(`Data de entrada anterior a ${DIAS_MAXIMOS_RETROATIVOS} dias.`);
+      }
+    }
+    return erros;
+  }
 
-    if (dataMs > agora) return false;
-    if (agora - dataMs > noventaDiasMs) return false;
+  resumo(): string {
+    return `${this.id} - NF ${this.nf}, ${this.transportadora}, entrada em ${this.dataEntrada.toISOString().slice(0, 10)}`;
+  }
 
-    return true;
+  static deJSON(bruto: any): Lote {
+    return new Lote(bruto.id, bruto.org, bruto.nf, bruto.transportadora, new Date(bruto.dataEntrada));
   }
 }
