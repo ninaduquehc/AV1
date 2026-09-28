@@ -1,55 +1,28 @@
-import { ContratoColeta } from "../models/contrato";
+import { Repositorio } from "../persistence/repositorio";
+import { Contrato } from "../models/contrato";
 import { FabricaEntidades } from "../models/fabrica";
 import { ARQ_CONTRATOS } from "../config/caminhos";
-import { Repositorio } from "../persistence/repositorio";
-import { registrarTransacao } from "../persistence/journal";
-import { carregarOrganizacoes } from "./organizacoes";
-import { parseData } from "../utils/datas";
 import { log } from "../utils/logger";
+import { registrarTransacao } from "../persistence/journal";
 
-const repositorio = new Repositorio<ContratoColeta>(ARQ_CONTRATOS, ContratoColeta.deJSON);
+const repo = new Repositorio<Contrato>(ARQ_CONTRATOS);
 
-export function carregarContratos(): ContratoColeta[] {
-  return repositorio.carregar();
-}
+export function executarContratos(opcoes: Record<string, string>, ctx: { usuario: string }): void {
+  const org = opcoes["org"];
+  const inicio = opcoes["inicio"];
+  const fim = opcoes["fim"];
+  const termos = opcoes["termos"] || "Termos padrão de logística reversa";
 
-export function cadastrarContrato(
-  orgTexto: string,
-  descricao: string,
-  inicioTexto: string,
-  fimTexto: string,
-  usuarioLogado: string
-): void {
-  const orgId = orgTexto.trim().toUpperCase();
-  const inicio = parseData(inicioTexto);
-  const fim = parseData(fimTexto);
-
-  if (!inicio || !fim) {
-    log.erro("Datas inválidas. Use o formato AAAA-MM-DD.");
+  if (!org || !inicio || !fim) {
+    log.erro("Uso: contrato criar --org <ORG_ID> --inicio <AAAA-MM-DD> --fim <AAAA-MM-DD> [--termos TEXTO]");
     return;
   }
 
-  const contratos = repositorio.carregar();
-  const contrato = FabricaEntidades.criarContrato(orgId, descricao.trim(), inicio, fim, contratos);
+  const contrato = FabricaEntidades.criarContrato(org, inicio, fim, termos);
+  const lista = repo.carregar();
+  lista.push(contrato);
+  repo.salvar(lista.map((c) => Contrato.deJSON(c)));
 
-  const erros = contrato.errosDeValidacao();
-  if (!carregarOrganizacoes().some((o) => o.id === orgId)) {
-    erros.push(`Organização "${orgId}" não encontrada.`);
-  }
-  if (erros.length > 0) {
-    erros.forEach((e) => log.erro(e));
-    return;
-  }
-
-  registrarTransacao(usuarioLogado, "cadastrar_contrato", {
-    id: contrato.id,
-    orgId,
-    descricao: contrato.descricao,
-    vigenciaInicio: inicioTexto.trim(),
-    vigenciaFim: fimTexto.trim(),
-  });
-
-  contratos.push(contrato);
-  repositorio.salvar(contratos);
-  log.sucesso(`Contrato ${contrato.id} cadastrado para a organização ${orgId}.`);
+  registrarTransacao(ctx.usuario, "cadastrar_contrato", { id: contrato.id, organizacaoId: org });
+  log.sucesso(`Contrato cadastrado com sucesso! ID: ${contrato.id}`);
 }

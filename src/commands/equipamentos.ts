@@ -1,134 +1,121 @@
-import { Equipamento } from "../models/equipamento";
-import { FabricaEntidades } from "../models/fabrica";
-import { RegraDeNegocioError } from "../models/erros";
-import { ARQ_EQUIPAMENTOS } from "../config/caminhos";
 import { Repositorio } from "../persistence/repositorio";
-import { registrarTransacao } from "../persistence/journal";
-import { carregarLotes } from "./lotes";
-import { registrarMovimentacao } from "./movimentacoes";
-import { comTratamento } from "../utils/tratamento";
+import { Equipamento, EstadoFisico, HIERARQUIA_ESTADO } from "../models/equipamento";
+import { Movimentacao } from "../models/movimentacao";
+import { FabricaEntidades } from "../models/fabrica";
+import { ARQ_EQUIPAMENTOS, ARQ_MOVIMENTACOES } from "../config/caminhos";
 import { log } from "../utils/logger";
+import { registrarTransacao } from "../persistence/journal";
+import { RegraDeNegocioError } from "../models/erros";
 
-const repositorio = new Repositorio<Equipamento>(ARQ_EQUIPAMENTOS, Equipamento.deJSON);
+const repoEq = new Repositorio<Equipamento>(ARQ_EQUIPAMENTOS);
+const repoMov = new Repositorio<Movimentacao>(ARQ_MOVIMENTACOES);
 
-export function carregarEquipamentos(): Equipamento[] {
-  return repositorio.carregar();
-}
+export function executarEquipamentos(subAcao: string, opcoes: Record<string, string>, ctx: { usuario: string }): void {
+  if (subAcao === "criar") {
+    const id = opcoes["id"];
+    const lote = opcoes["lote"];
+    const tipo = opcoes["tipo"];
+    const modelo = opcoes["modelo"];
+    const estado = (opcoes["estado"] || "B_BOM") as EstadoFisico;
 
-export function cadastrarEquipamento(
-  idTexto: string,
-  loteTexto: string,
-  estadoTexto: string,
-  usuarioLogado: string
-): void {
-  const id = idTexto.trim();
-  const loteId = loteTexto.trim().toUpperCase();
-  const estado = estadoTexto.trim().toLowerCase();
+    if (!id || !lote || !tipo || !modelo) {
+      log.erro("Uso: equipamento criar --id <COD_BARRAS> --lote <LOTE_ID> --tipo <TIPO> --modelo <MODELO> [--estado ESTADO]");
+      return;
+    }
 
-  const equipamentos = repositorio.carregar();
-  const equipamento = FabricaEntidades.criarEquipamento(id, loteId, estado, equipamentos);
+    const lista = repoEq.carregar();
+    if (lista.some((e) => e.id === id)) {
+      log.erro("Já existe um equipamento cadastrado com esse código de barras.");
+      return;
+    }
 
-  const erros = equipamento.errosDeValidacao();
-  if (!carregarLotes().some((l) => l.id === loteId)) {
-    erros.push(`Lote "${loteId}" não encontrado.`);
+    const eq = FabricaEntidades.criarEquipamento(id, lote, tipo, modelo, estado);
+    const novaLista = [...lista.map((item) => Equipamento.deJSON(item)), eq];
+    repoEq.salvar(novaLista);
+
+    registrarTransacao(ctx.usuario, "cadastrar_equipamento", { id: eq.id, loteId: lote });
+    log.sucesso(`Equipamento '${eq.id}' cadastrado com sucesso.`);
+  } else if (subAcao === "triar") {
+    const id = opcoes["id"];
+    if (!id) {
+      log.erro("Uso: equipamento triar --id <COD_BARRAS>");
+      return;
+    }
+
+    const lista = repoEq.carregar().map((e) => Equipamento.deJSON(e));
+    const eq = lista.find((e) => e.id === id);
+    if (!eq) {
+      log.erro("Equipamento não encontrado.");
+      return;
+    }
+
+    eq.triagemConcluida = true;
+    eq.status = "triado";
+    repoEq.salvar(lista);
+
+    registrarTransacao(ctx.usuario, "concluir_triagem", { id: eq.id });
+    log.sucesso(`Triagem do equipamento '${eq.id}' concluída com sucesso.`);
+  } else if (subAcao === "desmonte") {
+    const id = opcoes["id"];
+    if (!id) {
+      log.erro("Uso: equipamento desmonte --id <COD_BARRAS>");
+      return;
+    }
+
+    const lista = repoEq.carregar().map((e) => Equipamento.deJSON(e));
+    const eq = lista.find((e) => e.id === id);
+    if (!eq) {
+      log.erro("Equipamento não encontrado.");
+      return;
+    }
+
+    if (!eq.triagemConcluida) {
+      throw new RegraDeNegocioError("Um equipamento só pode ser movido para o status de 'desmonte' após passar por triagem completa.");
+    }
+
+    const statusAnterior = eq.status;
+    eq.status = "em_desmonte";
+    repoEq.salvar(lista);
+
+    const movs = repoMov.carregar().map((m) => Movimentacao.deJSON(m));
+    movs.push(new Movimentacao(`MOV-${Date.now()}`, eq.id, ctx.usuario, statusAnterior, "em_desmonte", eq.estadoFisico, eq.estadoFisico));
+    repoMov.salvar(movs);
+
+    registrarTransacao(ctx.usuario, "mover_desmonte", { id: eq.id });
+    log.sucesso(`Equipamento '${eq.id}' movido para desmonte.`);
+  } else if (subAcao === "estado") {
+    const id = opcoes["id"];
+    const novoEstado = opcoes["novo"] as EstadoFisico;
+    const justificativa = opcoes["justificativa"];
+
+    if (!id || !novoEstado) {
+      log.erro("Uso: equipamento estado --id <COD_BARRAS> --novo <NOVO_ESTADO> [--justificativa TEXTO]");
+      return;
+    }
+
+    const lista = repoEq.carregar().map((e) => Equipamento.deJSON(e));
+    const eq = lista.find((e) => e.id === id);
+    if (!eq) {
+      log.erro("Equipamento não encontrado.");
+      return;
+    }
+
+    const nivelAntigo = HIERARQUIA_ESTADO[eq.estadoFisico];
+    const nivelNovo = HIERARQUIA_ESTADO[novoEstado];
+
+    if (nivelAntigo - nivelNovo >= 2 && (!justificativa || justificativa.trim().length === 0)) {
+      throw new RegraDeNegocioError("Obrigatoriedade de justificativa textual sempre que o estado físico for alterado para duas ou mais categorias abaixo.");
+    }
+
+    const estadoAnterior = eq.estadoFisico;
+    eq.estadoFisico = novoEstado;
+    repoEq.salvar(lista);
+
+    const movs = repoMov.carregar().map((m) => Movimentacao.deJSON(m));
+    movs.push(new Movimentacao(`MOV-${Date.now()}`, eq.id, ctx.usuario, eq.status, eq.status, estadoAnterior, novoEstado, justificativa));
+    repoMov.salvar(movs);
+
+    registrarTransacao(ctx.usuario, "alterar_estado", { id: eq.id, de: estadoAnterior, para: novoEstado });
+    log.sucesso(`Estado físico do equipamento '${eq.id}' alterado para ${novoEstado}.`);
   }
-  if (equipamentos.some((e) => e.id === id)) {
-    erros.push(`Já existe um equipamento com ID "${id}".`);
-  }
-  if (erros.length > 0) {
-    erros.forEach((e) => log.erro(e));
-    return;
-  }
-
-  registrarTransacao(usuarioLogado, "cadastrar_equipamento", {
-    id,
-    loteId,
-    estadoFisico: estado,
-    codigoBarras: equipamento.codigoBarras,
-  });
-
-  equipamentos.push(equipamento);
-  repositorio.salvar(equipamentos);
-  registrarMovimentacao(id, "cadastro", "-", equipamento.status, usuarioLogado, null);
-  log.sucesso(`Equipamento "${id}" cadastrado. Código de barras: ${equipamento.codigoBarras}.`);
-}
-
-function transicionarStatus(
-  idTexto: string,
-  usuarioLogado: string,
-  acaoJournal: string,
-  tipoMovimentacao: string,
-  aplicar: (equipamento: Equipamento) => void,
-  mensagemSucesso: (id: string) => string
-): void {
-  comTratamento(() => {
-    const equipamentos = repositorio.carregar();
-    const equipamento = equipamentos.find((e) => e.id === idTexto.trim());
-    if (!equipamento) throw new RegraDeNegocioError("Equipamento não encontrado.");
-
-    const statusAnterior = equipamento.status;
-    aplicar(equipamento); // lança erro se a regra for violada (nada foi gravado ainda)
-
-    registrarTransacao(usuarioLogado, acaoJournal, {
-      id: equipamento.id,
-      de: statusAnterior,
-      para: equipamento.status,
-    });
-
-    repositorio.salvar(equipamentos);
-    registrarMovimentacao(equipamento.id, tipoMovimentacao, statusAnterior, equipamento.status, usuarioLogado, null);
-    log.sucesso(mensagemSucesso(equipamento.id));
-  });
-}
-
-export function concluirTriagemEquipamento(id: string, usuarioLogado: string): void {
-  transicionarStatus(
-    id,
-    usuarioLogado,
-    "concluir_triagem",
-    "triagem",
-    (e) => e.concluirTriagem(),
-    (eid) => `Triagem do equipamento "${eid}" concluída.`
-  );
-}
-
-export function moverEquipamentoParaDesmonte(id: string, usuarioLogado: string): void {
-  transicionarStatus(
-    id,
-    usuarioLogado,
-    "mover_para_desmonte",
-    "desmonte",
-    (e) => e.moverParaDesmonte(),
-    (eid) => `Equipamento "${eid}" movido para desmonte.`
-  );
-}
-
-export function alterarEstadoFisicoEquipamento(
-  idTexto: string,
-  novoEstadoTexto: string,
-  justificativaTexto: string,
-  usuarioLogado: string
-): void {
-  comTratamento(() => {
-    const equipamentos = repositorio.carregar();
-    const equipamento = equipamentos.find((e) => e.id === idTexto.trim());
-    if (!equipamento) throw new RegraDeNegocioError("Equipamento não encontrado.");
-
-    const novoEstado = novoEstadoTexto.trim().toLowerCase();
-    const justificativa = justificativaTexto.trim() === "" ? null : justificativaTexto.trim();
-    const estadoAnterior = equipamento.estadoFisico;
-
-    equipamento.alterarEstadoFisico(novoEstado, justificativa);
-
-    registrarTransacao(usuarioLogado, "alterar_estado_fisico", {
-      id: equipamento.id,
-      de: estadoAnterior,
-      para: novoEstado,
-      justificativa,
-    });
-
-    repositorio.salvar(equipamentos);
-    registrarMovimentacao(equipamento.id, "estado_fisico", estadoAnterior, novoEstado, usuarioLogado, justificativa);
-    log.sucesso(`Estado físico de "${equipamento.id}" alterado: ${estadoAnterior} → ${novoEstado}.`);
-  });
 }

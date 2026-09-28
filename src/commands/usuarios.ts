@@ -1,34 +1,33 @@
-import { adicionarCredencial, buscarCredencial } from "../auth/credenciais";
+import { adicionarCredencial } from "../auth/credenciais";
 import { PAPEIS_CRIAVEIS } from "../auth/papeis";
-import { registrarTransacao } from "../persistence/journal";
 import { log } from "../utils/logger";
+import { registrarTransacao } from "../persistence/journal";
 
-export function criarUsuario(
-  usuarioTexto: string,
-  senha: string,
-  papel: string,
-  usuarioLogado: string
-): void {
-  const usuario = usuarioTexto.trim();
+export function executarUsuarios(opcoes: Record<string, string>, ctx: { usuario: string }): void {
+  const usuarioNovo = opcoes["usuario"];
+  const senha = opcoes["senha"];
+  const papel = opcoes["papel"];
 
-  if (!usuario) {
-    log.erro("Nome de usuário não pode ser vazio.");
+  if (!usuarioNovo || !senha || !papel) {
+    log.erro("Uso: usuario criar --usuario <NOME> --senha <SENHA> --papel <PAPEL>");
     return;
   }
-  if (senha.length < 8) {
-    log.erro("A senha deve ter pelo menos 8 caracteres.");
-    return;
-  }
+
   if (!PAPEIS_CRIAVEIS.includes(papel)) {
-    log.erro(`Papel inválido. Use: ${PAPEIS_CRIAVEIS.join(", ")}.`);
-    return;
-  }
-  if (buscarCredencial(usuario)) {
-    log.erro("Já existe um usuário com esse nome.");
+    log.erro(`Papel inválido. Opções válidas: ${PAPEIS_CRIAVEIS.join(", ")}`);
     return;
   }
 
-  registrarTransacao(usuarioLogado, "criar_usuario", { usuario, papel });
-  adicionarCredencial(usuario, senha, papel);
-  log.sucesso(`Usuário "${usuario}" criado com papel "${papel}".`);
+  if (senha.length < 8) {
+    log.erro("A senha deve possuir pelo menos 8 caracteres.");
+    return;
+  }
+
+  const sucesso = adicionarCredencial(usuarioNovo, senha, papel);
+  if (sucesso) {
+    registrarTransacao(ctx.usuario, "criar_usuario", { usuarioNovo, papel });
+    log.sucesso(`Usuário '${usuarioNovo}' cadastrado com sucesso com papel '${papel}'.`);
+  } else {
+    log.erro("Usuário já existente no sistema.");
+  }
 }
