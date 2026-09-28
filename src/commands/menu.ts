@@ -31,5 +31,5 @@ export function exibirMenu(papel: string): void {
   ITENS_MENU.filter((i) => temPermissao(papel, i.acao)).forEach((i) => {
     console.log(`${i.opcao}. ${i.rotulo}`);
   });
-  console.log("0. Sair");
+  console.log("0. Voltar ao modo comando");
 }
