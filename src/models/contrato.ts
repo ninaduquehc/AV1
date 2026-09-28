@@ -1,42 +1,57 @@
 import { Entidade } from "./entidade";
+import { Validavel } from "./validavel";
+import { RegraDeNegocioError } from "./erros";
 
-export class ContratoColeta extends Entidade {
+export class Contrato extends Entidade implements Validavel {
+  public id: string;
+  public organizacaoId: string;
+  public dataInicio: string;
+  public dataFim: string;
+  public termos: string;
+
   constructor(
-    public readonly id: string,
-    public orgId: string,
-    public descricao: string,
-    public vigenciaInicio: Date,
-    public vigenciaFim: Date
+    id: string,
+    organizacaoId: string,
+    dataInicio: string,
+    dataFim: string,
+    termos: string
   ) {
     super();
+    this.id = id;
+    this.organizacaoId = organizacaoId;
+    this.dataInicio = dataInicio;
+    this.dataFim = dataFim;
+    this.termos = termos;
   }
 
-  protected regras(): string[] {
-    const erros: string[] = [];
-    if (!this.orgId) erros.push("Organização é obrigatória.");
-    if (!this.descricao) erros.push("Descrição do contrato é obrigatória.");
+  public validar(): boolean {
+    const inicio = new Date(this.dataInicio).getTime();
+    const fim = new Date(this.dataFim).getTime();
 
-    const inicio = this.vigenciaInicio.getTime();
-    const fim = this.vigenciaFim.getTime();
     if (isNaN(inicio) || isNaN(fim)) {
-      erros.push("Datas de vigência inválidas.");
-    } else if (fim <= inicio) {
-      erros.push("O fim da vigência deve ser posterior ao início.");
+      throw new RegraDeNegocioError("Datas do contrato em formato inválido.");
     }
-    return erros;
+    if (fim <= inicio) {
+      throw new RegraDeNegocioError("A data de término do contrato deve ser posterior à data de início.");
+    }
+    return true;
   }
 
-  resumo(): string {
-    return `${this.id} - ${this.orgId} (${this.vigenciaInicio.toISOString().slice(0, 10)} a ${this.vigenciaFim.toISOString().slice(0, 10)})`;
+  public regras(): string[] {
+    return ["Data final deve ser posterior à data inicial", "Datas devem ser válidas"];
   }
 
-  static deJSON(bruto: any): ContratoColeta {
-    return new ContratoColeta(
-      bruto.id,
-      bruto.orgId,
-      bruto.descricao,
-      new Date(bruto.vigenciaInicio),
-      new Date(bruto.vigenciaFim)
+  public resumo(): string {
+    return `Contrato ${this.id} (Org: ${this.organizacaoId}) - Vantagem: ${this.dataInicio} até ${this.dataFim}`;
+  }
+
+  public static deJSON(dados: any, _index?: number): Contrato {
+    return new Contrato(
+      dados.id,
+      dados.organizacaoId,
+      dados.dataInicio,
+      dados.dataFim,
+      dados.termos
     );
   }
 }

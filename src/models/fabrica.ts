@@ -1,53 +1,33 @@
 import { Organizacao } from "./organizacao";
+import { Contrato } from "./contrato";
 import { Lote } from "./lote";
-import { Equipamento } from "./equipamento";
-import { ContratoColeta } from "./contrato";
+import { Equipamento, EstadoFisico } from "./equipamento";
 
 export class FabricaEntidades {
-  // Gera o próximo ID sequencial: prefixo "BR", largura 3 → BR001, BR002...
-  static proximoId(prefixo: string, idsExistentes: string[], largura: number): string {
-    const maior = idsExistentes
-      .map((id) => Number(id.slice(prefixo.length)))
-      .filter((n) => !isNaN(n))
-      .reduce((a, b) => Math.max(a, b), 0);
-    return prefixo + String(maior + 1).padStart(largura, "0");
+  public static criarOrganizacao(razosocial: string, cnpj: string, tipo: any): Organizacao {
+    const id = `ORG-${Date.now().toString().slice(-6)}`;
+    const org = new Organizacao(id, razosocial, cnpj, tipo);
+    org.validar();
+    return org;
   }
 
-  static criarOrganizacao(cnpj: string, nome: string, existentes: Organizacao[]): Organizacao {
-    const id = FabricaEntidades.proximoId("BR", existentes.map((o) => o.id), 3);
-    return new Organizacao(id, cnpj, nome);
+  public static criarContrato(organizacaoId: string, dataInicio: string, dataFim: string, termos: string): Contrato {
+    const id = `CTR-${Date.now().toString().slice(-6)}`;
+    const contrato = new Contrato(id, organizacaoId, dataInicio, dataFim, termos);
+    contrato.validar();
+    return contrato;
   }
 
-  static criarLote(
-    org: string,
-    nf: string,
-    transportadora: string,
-    dataEntrada: Date,
-    existentes: Lote[]
-  ): Lote {
-    const id = FabricaEntidades.proximoId("LT", existentes.map((l) => l.id), 4);
-    return new Lote(id, org, nf, transportadora, dataEntrada);
+  public static criarLote(organizacaoId: string, notaFiscal: string, transportadora: string, dataEntrada: string): Lote {
+    const id = `LOT-${Date.now().toString().slice(-6)}`;
+    const lote = new Lote(id, organizacaoId, notaFiscal, transportadora, dataEntrada);
+    lote.validar();
+    return lote;
   }
 
-  static criarContrato(
-    orgId: string,
-    descricao: string,
-    inicio: Date,
-    fim: Date,
-    existentes: ContratoColeta[]
-  ): ContratoColeta {
-    const id = FabricaEntidades.proximoId("CT", existentes.map((c) => c.id), 4);
-    return new ContratoColeta(id, orgId, descricao, inicio, fim);
-  }
-
-  // Aloca automaticamente o código de barras interno.
-  static criarEquipamento(
-    id: string,
-    loteId: string,
-    estadoFisico: string,
-    existentes: Equipamento[]
-  ): Equipamento {
-    const codigo = FabricaEntidades.proximoId("GC", existentes.map((e) => e.codigoBarras), 8);
-    return new Equipamento(id, loteId, estadoFisico, codigo);
+  public static criarEquipamento(codigoBarras: string, loteId: string, tipo: string, modelo: string, estado: EstadoFisico): Equipamento {
+    const eq = new Equipamento(codigoBarras, loteId, tipo, modelo, estado);
+    eq.validar();
+    return eq;
   }
 }

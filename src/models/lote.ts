@@ -1,42 +1,66 @@
 import { Entidade } from "./entidade";
+import { Validavel } from "./validavel";
+import { RegraDeNegocioError } from "./erros";
 
-const DIAS_MAXIMOS_RETROATIVOS = 90;
+export class Lote extends Entidade implements Validavel {
+  public id: string;
+  public organizacaoId: string;
+  public notaFiscal: string;
+  public transportadora: string;
+  public dataEntrada: string;
 
-export class Lote extends Entidade {
   constructor(
-    public readonly id: string,
-    public org: string,
-    public nf: string,
-    public transportadora: string,
-    public dataEntrada: Date
+    id: string,
+    organizacaoId: string,
+    notaFiscal: string,
+    transportadora: string,
+    dataEntrada: string
   ) {
     super();
+    this.id = id;
+    this.organizacaoId = organizacaoId;
+    this.notaFiscal = notaFiscal;
+    this.transportadora = transportadora;
+    this.dataEntrada = dataEntrada;
   }
 
-  protected regras(): string[] {
-    const erros: string[] = [];
-    if (!this.org) erros.push("Organização é obrigatória.");
-    if (!this.nf) erros.push("Nota fiscal é obrigatória.");
-    if (!this.transportadora) erros.push("Transportadora é obrigatória.");
+  public validar(): boolean {
+    const data = new Date(this.dataEntrada);
+    const agora = new Date();
 
-    const dataMs = this.dataEntrada.getTime();
-    if (isNaN(dataMs)) {
-      erros.push("Data de entrada inválida.");
-    } else {
-      const agora = Date.now();
-      if (dataMs > agora) erros.push("Data de entrada não pode ser futura.");
-      if (agora - dataMs > DIAS_MAXIMOS_RETROATIVOS * 24 * 60 * 60 * 1000) {
-        erros.push(`Data de entrada anterior a ${DIAS_MAXIMOS_RETROATIVOS} dias.`);
-      }
+    if (isNaN(data.getTime())) {
+      throw new RegraDeNegocioError("Data de entrada do lote inválida.");
     }
-    return erros;
+
+    if (data > agora) {
+      throw new RegraDeNegocioError("Não é permitido cadastrar lotes com data de entrada futura.");
+    }
+
+    const noventaDiasAtras = new Date();
+    noventaDiasAtras.setDate(agora.getDate() - 90);
+
+    if (data < noventaDiasAtras) {
+      throw new RegraDeNegocioError("Não é permitido cadastrar lotes com data de entrada superior a 90 dias passados.");
+    }
+
+    return true;
   }
 
-  resumo(): string {
-    return `${this.id} - NF ${this.nf}, ${this.transportadora}, entrada em ${this.dataEntrada.toISOString().slice(0, 10)}`;
+  public regras(): string[] {
+    return ["Data de entrada não pode ser futura", "Data de entrada não pode ter mais de 90 dias"];
   }
 
-  static deJSON(bruto: any): Lote {
-    return new Lote(bruto.id, bruto.org, bruto.nf, bruto.transportadora, new Date(bruto.dataEntrada));
+  public resumo(): string {
+    return `Lote ${this.id} - NF: ${this.notaFiscal} (${this.transportadora})`;
+  }
+
+  public static deJSON(dados: any, _index?: number): Lote {
+    return new Lote(
+      dados.id,
+      dados.organizacaoId,
+      dados.notaFiscal,
+      dados.transportadora,
+      dados.dataEntrada
+    );
   }
 }

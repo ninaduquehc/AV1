@@ -1,74 +1,73 @@
 import { Entidade } from "./entidade";
+import { Validavel } from "./validavel";
 import { RegraDeNegocioError } from "./erros";
 
-export const ESTADOS_FISICOS = ["novo", "bom", "regular", "ruim", "sucata"];
+export type EstadoFisico = "A_EXCELENTE" | "B_BOM" | "C_REGULAR" | "D_DANIFICADO" | "E_SUCATA";
+export type StatusEquipamento = "recebido" | "triado" | "em_desmonte" | "recuperado" | "descartado";
 
-export type StatusEquipamento = "triagem_pendente" | "triagem_completa" | "desmonte";
+export const HIERARQUIA_ESTADO: Record<EstadoFisico, number> = {
+  A_EXCELENTE: 5,
+  B_BOM: 4,
+  C_REGULAR: 3,
+  D_DANIFICADO: 2,
+  E_SUCATA: 1,
+};
 
-export class Equipamento extends Entidade {
+export class Equipamento extends Entidade implements Validavel {
+  public id: string; // Código de barras
+  public loteId: string;
+  public tipo: string;
+  public modelo: string;
+  public estadoFisico: EstadoFisico;
+  public status: StatusEquipamento;
+  public triagemConcluida: boolean;
+
   constructor(
-    public readonly id: string,
-    public readonly loteId: string,
-    public estadoFisico: string,
-    public readonly codigoBarras: string,
-    public status: StatusEquipamento = "triagem_pendente"
+    id: string,
+    loteId: string,
+    tipo: string,
+    modelo: string,
+    estadoFisico: EstadoFisico,
+    status: StatusEquipamento = "recebido",
+    triagemConcluida: boolean = false
   ) {
     super();
+    this.id = id;
+    this.loteId = loteId;
+    this.tipo = tipo;
+    this.modelo = modelo;
+    this.estadoFisico = estadoFisico;
+    this.status = status;
+    this.triagemConcluida = triagemConcluida;
   }
 
-  protected regras(): string[] {
-    const erros: string[] = [];
-    if (!this.id) erros.push("ID do equipamento é obrigatório.");
-    if (!this.loteId) erros.push("ID do lote é obrigatório.");
-    if (!ESTADOS_FISICOS.includes(this.estadoFisico)) {
-      erros.push(`Estado físico inválido. Use: ${ESTADOS_FISICOS.join(", ")}.`);
+  public validar(): boolean {
+    if (!this.id || this.id.trim().length === 0) {
+      throw new RegraDeNegocioError("Código de barras do equipamento é obrigatório.");
     }
-    return erros;
+    if (!this.tipo || !this.modelo) {
+      throw new RegraDeNegocioError("Tipo e modelo são obrigatórios para o equipamento.");
+    }
+    return true;
   }
 
-  resumo(): string {
-    return `${this.id} [${this.codigoBarras}] - estado: ${this.estadoFisico}, status: ${this.status}`;
+  public regras(): string[] {
+    return ["Código de barras obrigatório", "Desmonte exige triagem concluída", "Degradação >= 2 níveis exige justificativa"];
   }
 
-  concluirTriagem(): void {
-    if (this.status !== "triagem_pendente") {
-      throw new RegraDeNegocioError(`Triagem não pode ser concluída: status atual é "${this.status}".`);
-    }
-    this.status = "triagem_completa";
+  public resumo(): string {
+    return `Equipamento ${this.id} (${this.tipo} ${this.modelo}) - Status: ${this.status}`;
   }
 
-  moverParaDesmonte(): void {
-    if (this.status !== "triagem_completa") {
-      throw new RegraDeNegocioError("Equipamento precisa concluir a triagem antes do desmonte.");
-    }
-    this.status = "desmonte";
-  }
-
-  alterarEstadoFisico(novoEstado: string, justificativa: string | null): void {
-    if (!ESTADOS_FISICOS.includes(novoEstado)) {
-      throw new RegraDeNegocioError(`Estado físico inválido. Use: ${ESTADOS_FISICOS.join(", ")}.`);
-    }
-
-    const queda = ESTADOS_FISICOS.indexOf(novoEstado) - ESTADOS_FISICOS.indexOf(this.estadoFisico);
-    if (queda === 0) {
-      throw new RegraDeNegocioError("O equipamento já está nesse estado físico.");
-    }
-    if (queda >= 2 && !(justificativa && justificativa.trim())) {
-      throw new RegraDeNegocioError(
-        "Justificativa obrigatória quando o estado cai duas ou mais categorias."
-      );
-    }
-
-    this.estadoFisico = novoEstado;
-  }
-
-  static deJSON(bruto: any): Equipamento {
+  public static deJSON(dados: any, _index?: number): Equipamento {
     return new Equipamento(
-      bruto.id,
-      bruto.loteId,
-      bruto.estadoFisico,
-      bruto.codigoBarras,
-      bruto.status as StatusEquipamento
+      dados.id,
+      dados.loteId,
+      dados.tipo,
+      dados.modelo,
+      dados.estadoFisico,
+      dados.status,
+      dados.triagemConcluida
     );
   }
 }
