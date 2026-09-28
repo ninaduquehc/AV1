@@ -1,70 +1,34 @@
-export class ErroDeUso extends Error {}
-
-export interface ArgsComando {
+export interface ComandoParsed {
+  acaoPrincipal: string;
+  subAcao: string;
+  opcoes: Record<string, string>;
   posicionais: string[];
-  flags: Record<string, string>;
 }
 
-// Separa a linha em tokens. Aspas duplas agrupam valores com espaços.
-export function tokenizar(linha: string): string[] {
-  const tokens: string[] = [];
-  let atual = "";
-  let dentroDeAspas = false;
-  let temToken = false;
+export function parseLinhaComando(linha: string): ComandoParsed {
+  const partes = linha.trim().split(/\s+/);
+  const acaoPrincipal = partes[0] || "";
+  const subAcao = partes[1] && !partes[1].startsWith("--") ? partes[1] : "";
 
-  for (const c of linha) {
-    if (dentroDeAspas) {
-      if (c === '"') dentroDeAspas = false;
-      else atual += c;
-    } else if (c === '"') {
-      dentroDeAspas = true;
-      temToken = true;
-    } else if (/\s/.test(c)) {
-      if (temToken) {
-        tokens.push(atual);
-        atual = "";
-        temToken = false;
+  const inicioOpcoes = subAcao ? 2 : 1;
+  const opcoes: Record<string, string> = {};
+  const posicionais: string[] = [];
+
+  for (let i = inicioOpcoes; i < partes.length; i++) {
+    const parte = partes[i];
+    if (parte.startsWith("--")) {
+      const chave = parte.slice(2);
+      const proximo = partes[i + 1];
+      if (proximo && !proximo.startsWith("--")) {
+        opcoes[chave] = proximo;
+        i++;
+      } else {
+        opcoes[chave] = "true";
       }
     } else {
-      atual += c;
-      temToken = true;
+      posicionais.push(parte);
     }
   }
 
-  if (dentroDeAspas) throw new ErroDeUso("Aspas não fechadas.");
-  if (temToken) tokens.push(atual);
-  return tokens;
-}
-
-// Separa posicionais de flags (--flag valor ou --flag=valor).
-export function analisarArgumentos(tokens: string[]): ArgsComando {
-  const posicionais: string[] = [];
-  const flags: Record<string, string> = Object.create(null);
-
-  for (let i = 0; i < tokens.length; i++) {
-    const token = tokens[i];
-
-    if (!token.startsWith("--")) {
-      posicionais.push(token);
-      continue;
-    }
-
-    const corpo = token.slice(2);
-    if (!corpo) throw new ErroDeUso("Flag vazia.");
-
-    const igual = corpo.indexOf("=");
-    if (igual >= 0) {
-      flags[corpo.slice(0, igual)] = corpo.slice(igual + 1);
-      continue;
-    }
-
-    const proximo = tokens[i + 1];
-    if (proximo === undefined || proximo.startsWith("--")) {
-      throw new ErroDeUso(`A flag --${corpo} precisa de um valor.`);
-    }
-    flags[corpo] = proximo;
-    i++;
-  }
-
-  return { posicionais, flags };
+  return { acaoPrincipal, subAcao, opcoes, posicionais };
 }

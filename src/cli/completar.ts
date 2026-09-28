@@ -1,37 +1,29 @@
-import { comandosDisponiveis } from "./comandos";
+import { temPermissao, Acao } from "../auth/permissoes";
 
-// Completa comandos, subcomandos e flags, respeitando as permissões do papel.
+const COMANDOS_MAPA: Record<string, Acao> = {
+  usuario: "gerenciar_usuarios",
+  parametro: "configurar_parametros",
+  organizacao: "cadastrar_organizacao",
+  contrato: "cadastrar_contrato",
+  lote: "registrar_lote",
+  equipamento: "cadastrar_equipamento",
+  triagem: "concluir_triagem",
+  desmonte: "mover_desmonte",
+  estado: "alterar_estado",
+  historico: "consultar_historico",
+  rastrear: "rastrear_equipamento",
+  relatorio: "gerar_relatorio",
+};
+
 export function criarCompletador(papel: string) {
-  return (linha: string): [string[], string] => {
-    const disponiveis = comandosDisponiveis(papel);
-    const tokens = linha.split(/\s+/).filter((t) => t !== "");
-    const terminaEmEspaco = /\s$/.test(linha) || tokens.length === 0;
+  return (line: string): [string[], string] => {
+    const listaDisponivel = Object.entries(COMANDOS_MAPA)
+      .filter(([_, acao]) => temPermissao(papel, acao))
+      .map(([cmd]) => cmd);
 
-    const atual = terminaEmEspaco ? "" : tokens[tokens.length - 1];
-    const anteriores = terminaEmEspaco ? tokens : tokens.slice(0, -1);
-    const n = anteriores.length;
+    listaDisponivel.push("ajuda", "menu", "sair");
 
-    let candidatos: string[] = [];
-
-    // Nome do comando ou subcomando na posição atual.
-    disponiveis.forEach((c) => {
-      if (c.nome.length > n && anteriores.every((t, i) => c.nome[i] === t)) {
-        candidatos.push(c.nome[n]);
-      }
-    });
-
-    // Comando já completo: sugere as flags que ainda não foram usadas.
-    const comando = disponiveis.find(
-      (c) => c.nome.length <= n && c.nome.every((parte, i) => anteriores[i] === parte)
-    );
-    if (comando) {
-      const usadas = anteriores.filter((t) => t.startsWith("--"));
-      candidatos = [...comando.flagsObrigatorias, ...comando.flagsOpcionais]
-        .map((f) => `--${f}`)
-        .filter((f) => !usadas.includes(f));
-    }
-
-    const unicos = Array.from(new Set(candidatos));
-    return [unicos.filter((c) => c.startsWith(atual)), atual];
+    const hits = listaDisponivel.filter((c) => c.startsWith(line.trim()));
+    return [hits.length ? hits : listaDisponivel, line];
   };
 }
