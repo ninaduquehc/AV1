@@ -1,37 +1,36 @@
+import { Repositorio } from "../persistence/repositorio";
 import { Organizacao } from "../models/organizacao";
 import { FabricaEntidades } from "../models/fabrica";
 import { ARQ_ORGANIZACOES } from "../config/caminhos";
-import { Repositorio } from "../persistence/repositorio";
-import { registrarTransacao } from "../persistence/journal";
 import { log } from "../utils/logger";
+import { registrarTransacao } from "../persistence/journal";
 
-const repositorio = new Repositorio<Organizacao>(ARQ_ORGANIZACOES, Organizacao.deJSON);
+const repo = new Repositorio<Organizacao>(ARQ_ORGANIZACOES);
 
-export function carregarOrganizacoes(): Organizacao[] {
-  return repositorio.carregar();
-}
+export function executarOrganizacoes(opcoes: Record<string, string>, ctx: { usuario: string }): void {
+  const nome = opcoes["nome"];
+  const cnpj = opcoes["cnpj"];
+  const tipo = opcoes["tipo"] as any;
 
-export function cadastrarOrganizacao(cnpj: string, nome: string, usuarioLogado: string): void {
-  const cnpjNumeros = cnpj.replace(/\D/g, ""); // com ou sem pontuação, é o mesmo CNPJ
-  const organizacoes = repositorio.carregar();
-  const organizacao = FabricaEntidades.criarOrganizacao(cnpjNumeros, nome.trim(), organizacoes);
-
-  const erros = organizacao.errosDeValidacao();
-  if (organizacoes.some((o) => o.cnpj === organizacao.cnpj)) {
-    erros.push("Já existe uma organização cadastrada com esse CNPJ.");
-  }
-  if (erros.length > 0) {
-    erros.forEach((e) => log.erro(e));
+  if (!nome || !cnpj || !tipo) {
+    log.erro("Uso: organizacao criar --nome <RAZAO_SOCIAL> --cnpj <CNPJ> --tipo <gerador|operador_logistico|desmontadora|comprador>");
     return;
   }
 
-  registrarTransacao(usuarioLogado, "cadastrar_organizacao", {
-    id: organizacao.id,
-    cnpj: cnpjNumeros,
-    nome: organizacao.nome,
-  });
+  const lista = repo.carregar();
+  const cnpjLimpo = cnpj.replace(/\D/g, "");
 
-  organizacoes.push(organizacao);
-  repositorio.salvar(organizacoes);
-  log.sucesso(`Organização "${organizacao.nome}" cadastrada com ID ${organizacao.id}.`);
+  if (lista.some((o) => o.cnpj.replace(/\D/g, "") === cnpjLimpo)) {
+    log.erro("Já existe uma organização cadastrada com este CNPJ.");
+    return;
+  }
+
+  const org = FabricaEntidades.criarOrganizacao(nome, cnpj, tipo);
+  
+  // Garante a chamada correta do método deJSON se necessário
+  const novaLista = [...lista.map((item) => Organizacao.deJSON(item)), org];
+  repo.salvar(novaLista);
+
+  registrarTransacao(ctx.usuario, "cadastrar_organizacao", { id: org.id, cnpj: org.cnpj });
+  log.sucesso(`Organização '${org.nome}' criada com sucesso! ID: ${org.id}`);
 }
