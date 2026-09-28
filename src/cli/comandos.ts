@@ -10,6 +10,8 @@ import { executarContratos } from "../commands/contratos";
 import { executarLotes } from "../commands/lotes";
 import { executarEquipamentos } from "../commands/equipamentos";
 import { executarRelatorios } from "../commands/relatorios";
+import { executarParametros, visualizarParametros } from "../commands/parametros";
+import { verificarEExibirHistorico } from "../commands/historico";
 
 export async function executarLinha(linha: string, ctx: { usuario: string; papel: string }): Promise<void> {
   const parsed = parseLinhaComando(linha);
@@ -17,6 +19,8 @@ export async function executarLinha(linha: string, ctx: { usuario: string; papel
   if (parsed.acaoPrincipal === "ajuda") {
     console.log("\nComandos disponíveis:");
     console.log("- usuario criar --usuario <NOME> --senha <SENHA> --papel <PAPEL>");
+    console.log("- parametro ver");
+    console.log("- parametro definir --aliquota <NUMERO> --depreciacao <NUMERO>");
     console.log("- organizacao criar --nome <NOME> --cnpj <CNPJ> --tipo <TIPO>");
     console.log("- contrato criar --org <ORG_ID> --inicio <AAAA-MM-DD> --fim <AAAA-MM-DD>");
     console.log("- lote criar --org <ORG_ID> --nf <NF> --transp <TRANSP>");
@@ -24,6 +28,7 @@ export async function executarLinha(linha: string, ctx: { usuario: string; papel
     console.log("- equipamento triar --id <COD>");
     console.log("- equipamento desmonte --id <COD>");
     console.log("- equipamento estado --id <COD> --novo <ESTADO> [--justificativa TEXTO]");
+    console.log("- historico");
     console.log("- relatorio journal");
     console.log("- relatorio rastrear --id <COD>");
     return;
@@ -38,6 +43,13 @@ export async function executarLinha(linha: string, ctx: { usuario: string; papel
     usuario: {
       acao: "gerenciar_usuarios",
       handler: () => executarUsuarios(parsed.opcoes, ctx),
+    },
+    parametro: {
+      acao: "configurar_parametros",
+      handler: () => {
+        if (parsed.subAcao === "ver") visualizarParametros();
+        else executarParametros(parsed.opcoes, ctx);
+      },
     },
     organizacao: {
       acao: "cadastrar_organizacao",
@@ -54,6 +66,10 @@ export async function executarLinha(linha: string, ctx: { usuario: string; papel
     equipamento: {
       acao: "cadastrar_equipamento",
       handler: () => executarEquipamentos(parsed.subAcao || "criar", parsed.opcoes, ctx),
+    },
+    historico: {
+      acao: "consultar_historico",
+      handler: () => verificarEExibirHistorico(),
     },
     relatorio: {
       acao: "gerar_relatorio",

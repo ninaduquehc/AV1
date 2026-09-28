@@ -32,3 +32,9 @@ export function executarParametros(opcoes: Record<string, string>, ctx: { usuari
   repo.salvar([novosParametros]);
   log.sucesso(`Parâmetros globais definidos: Alíquota ${aliquota}% | Depreciação ${depreciacao}%.`);
 }
+
+export function visualizarParametros(): void {
+  const repo = new Repositorio<ParametrosGlobais>(ARQ_PARAMETROS);
+  const atuais = repo.carregar()[0] ?? { aliquotaImposto: 0, coeficienteDepreciacao: 0, atualizadoEm: "—" };
+  log.info(`Alíquota de imposto: ${atuais.aliquotaImposto}% | Depreciação: ${atuais.coeficienteDepreciacao}% (atualizado em ${atuais.atualizadoEm})`);
+}
