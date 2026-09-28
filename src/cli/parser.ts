@@ -6,7 +6,10 @@ export interface ComandoParsed {
 }
 
 export function parseLinhaComando(linha: string): ComandoParsed {
-  const partes = linha.trim().split(/\s+/);
+  // Regex para capturar argumentos mantendo os conteúdos entre aspas unidos
+  const regex = /"[^"]*"|\S+/g;
+  const partes = (linha.match(regex) || []).map((p) => p.replace(/^"|"$/g, ""));
+
   const acaoPrincipal = partes[0] || "";
   const subAcao = partes[1] && !partes[1].startsWith("--") ? partes[1] : "";
 
@@ -23,7 +26,7 @@ export function parseLinhaComando(linha: string): ComandoParsed {
         opcoes[chave] = proximo;
         i++;
       } else {
-        opcoes[chave] = "true";
+        throw new Error(`A flag --${chave} precisa de um valor.`);
       }
     } else {
       posicionais.push(parte);

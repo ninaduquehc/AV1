@@ -3,55 +3,64 @@ import { Validavel } from "./validavel";
 import { cnpjValido } from "../utils/cnpj";
 import { RegraDeNegocioError } from "./erros";
 
+export type TipoOrganizacao = "gerador" | "operador_logistico" | "desmontadora" | "comprador";
+
 export class Organizacao extends Entidade implements Validavel {
   public id: string;
   public razosocial: string;
   public cnpj: string;
-  public tipo: "gerador" | "operador_logistico" | "desmontadora" | "comprador";
+  public tipo: TipoOrganizacao;
 
   constructor(
     id: string,
     razosocial: string,
     cnpj: string,
-    tipo: "gerador" | "operador_logistico" | "desmontadora" | "comprador"
+    tipo: TipoOrganizacao,
+    criadoEm?: string
   ) {
-    super();
+    super(criadoEm);
     this.id = id;
     this.razosocial = razosocial;
     this.cnpj = cnpj;
     this.tipo = tipo;
   }
 
-  // Getter de conveniência para o nome
   public get nome(): string {
     return this.razosocial;
   }
 
   public validar(): boolean {
+    const tiposValidos: TipoOrganizacao[] = ["gerador", "operador_logistico", "desmontadora", "comprador"];
+    if (!tiposValidos.includes(this.tipo)) {
+      throw new RegraDeNegocioError(`Tipo de organização '${this.tipo}' inválido. Opções: ${tiposValidos.join(", ")}`);
+    }
+
     if (!this.razosocial || this.razosocial.trim().length < 3) {
-      throw new RegraDeNegocioError("Razão social inválida.");
+      throw new RegraDeNegocioError("Razão social deve possuir ao menos 3 caracteres.");
     }
+
     if (!cnpjValido(this.cnpj)) {
-      throw new RegraDeNegocioError(`CNPJ '${this.cnpj}' é inválido segundo as regras oficiais.`);
+      throw new RegraDeNegocioError(`CNPJ '${this.cnpj}' é inválido.`);
     }
+
     return true;
   }
 
-  // Métodos no formato de função () => ... para corresponder à classe abstrata Entidade
   public regras(): string[] {
-    return ["CNPJ deve ser válido", "Razão social deve ter no mínimo 3 caracteres"];
+    return ["CNPJ deve ser válido", "Razão social válida", "Tipo de organização restrito"];
   }
 
   public resumo(): string {
     return `${this.razosocial} (${this.cnpj}) - ${this.tipo}`;
   }
 
-  public static deJSON(dados: any, _index?: number): Organizacao {
+  public static deJSON(dados: any): Organizacao {
     return new Organizacao(
       dados.id,
       dados.razosocial || dados.razaoSocial || dados.nome,
       dados.cnpj,
-      dados.tipo
+      dados.tipo,
+      dados.criadoEm
     );
   }
 }

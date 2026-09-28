@@ -14,7 +14,7 @@ export const HIERARQUIA_ESTADO: Record<EstadoFisico, number> = {
 };
 
 export class Equipamento extends Entidade implements Validavel {
-  public id: string; // Código de barras
+  public id: string;
   public loteId: string;
   public tipo: string;
   public modelo: string;
@@ -29,9 +29,10 @@ export class Equipamento extends Entidade implements Validavel {
     modelo: string,
     estadoFisico: EstadoFisico,
     status: StatusEquipamento = "recebido",
-    triagemConcluida: boolean = false
+    triagemConcluida: boolean = false,
+    criadoEm?: string
   ) {
-    super();
+    super(criadoEm);
     this.id = id;
     this.loteId = loteId;
     this.tipo = tipo;
@@ -42,24 +43,30 @@ export class Equipamento extends Entidade implements Validavel {
   }
 
   public validar(): boolean {
+    if (!HIERARQUIA_ESTADO[this.estadoFisico]) {
+      throw new RegraDeNegocioError(`Estado físico '${this.estadoFisico}' inválido. Opções válidas: ${Object.keys(HIERARQUIA_ESTADO).join(", ")}`);
+    }
+
     if (!this.id || this.id.trim().length === 0) {
       throw new RegraDeNegocioError("Código de barras do equipamento é obrigatório.");
     }
+
     if (!this.tipo || !this.modelo) {
-      throw new RegraDeNegocioError("Tipo e modelo são obrigatórios para o equipamento.");
+      throw new RegraDeNegocioError("Tipo e modelo são obrigatórios.");
     }
+
     return true;
   }
 
   public regras(): string[] {
-    return ["Código de barras obrigatório", "Desmonte exige triagem concluída", "Degradação >= 2 níveis exige justificativa"];
+    return ["Código de barras obrigatório", "Triagem prévia para desmonte", "Justificativa para degradação >= 2 níveis"];
   }
 
   public resumo(): string {
     return `Equipamento ${this.id} (${this.tipo} ${this.modelo}) - Status: ${this.status}`;
   }
 
-  public static deJSON(dados: any, _index?: number): Equipamento {
+  public static deJSON(dados: any): Equipamento {
     return new Equipamento(
       dados.id,
       dados.loteId,
@@ -67,7 +74,8 @@ export class Equipamento extends Entidade implements Validavel {
       dados.modelo,
       dados.estadoFisico,
       dados.status,
-      dados.triagemConcluida
+      dados.triagemConcluida,
+      dados.criadoEm
     );
   }
 }

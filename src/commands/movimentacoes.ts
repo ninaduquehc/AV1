@@ -1,31 +1,50 @@
+import * as crypto from "crypto";
+import { Repositorio } from "../persistence/repositorio";
 import { Movimentacao } from "../models/movimentacao";
 import { ARQ_MOVIMENTACOES } from "../config/caminhos";
-import { Repositorio } from "../persistence/repositorio";
+import { log } from "../utils/logger";
+import { EstadoFisico, StatusEquipamento } from "../models/equipamento";
 
-const repositorio = new Repositorio<Movimentacao>(ARQ_MOVIMENTACOES);
+const repo = new Repositorio<Movimentacao>(ARQ_MOVIMENTACOES);
 
 export function registrarMovimentacao(
   equipamentoId: string,
-  tipo: string,
-  de: string,
-  para: string,
   usuario: string,
-  justificativa: string | null
+  statusAnterior: StatusEquipamento,
+  statusNovo: StatusEquipamento,
+  estadoAnterior: EstadoFisico,
+  estadoNovo: EstadoFisico,
+  justificativa?: string | null
 ): void {
-  const lista = repositorio.carregar();
-  lista.push({
-    timestamp: new Date().toISOString(),
+  const lista = repo.carregar().map((m) => Movimentacao.deJSON(m));
+  const id = `MOV-${crypto.randomUUID()}`;
+
+  const justificativaTratada = justificativa || undefined;
+
+  const novaMovimentacao = new Movimentacao(
+    id,
     equipamentoId,
-    tipo,
-    de,
-    para,
     usuario,
-    justificativa,
-  });
-  repositorio.salvar(lista);
+    statusAnterior,
+    statusNovo,
+    estadoAnterior,
+    estadoNovo,
+    justificativaTratada
+  );
+
+  lista.push(novaMovimentacao);
+  repo.salvar(lista);
 }
 
-export function listarMovimentacoes(equipamentoId?: string): Movimentacao[] {
-  const lista = repositorio.carregar();
-  return equipamentoId ? lista.filter((m) => m.equipamentoId === equipamentoId) : lista;
+export function listarMovimentacoesPorEquipamento(equipamentoId: string): void {
+  const lista = repo.carregar().map((m) => Movimentacao.deJSON(m));
+  const filtradas = lista.filter((m) => m.equipamentoId === equipamentoId);
+
+  if (filtradas.length === 0) {
+    log.aviso(`Nenhuma movimentação encontrada para o equipamento '${equipamentoId}'.`);
+    return;
+  }
+
+  console.log(`\n=== HISTÓRICO DE MOVIMENTAÇÕES DO EQUIPAMENTO ${equipamentoId} ===`);
+  console.table(filtradas);
 }

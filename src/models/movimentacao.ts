@@ -19,9 +19,10 @@ export class Movimentacao extends Entidade {
     statusNovo: StatusEquipamento,
     estadoAnterior: EstadoFisico,
     estadoNovo: EstadoFisico,
-    justificativa?: string
+    justificativa?: string,
+    criadoEm?: string
   ) {
-    super();
+    super(criadoEm);
     this.id = id;
     this.equipamentoId = equipamentoId;
     this.usuario = usuario;
@@ -49,7 +50,8 @@ export class Movimentacao extends Entidade {
       dados.statusNovo,
       dados.estadoAnterior,
       dados.estadoNovo,
-      dados.justificativa
+      dados.justificativa,
+      dados.criadoEm
     );
   }
 }

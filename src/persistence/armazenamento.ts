@@ -13,23 +13,34 @@ function obterChaveAes(): Buffer {
 
 export function criptografar(dados: string): string {
   const chave = obterChaveAes();
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv("aes-256-cbc", chave, iv);
+  const iv = crypto.randomBytes(12); // IV de 12 bytes recomendado para AES-GCM
+  const cipher = crypto.createCipheriv("aes-256-gcm", chave, iv);
+
   let encriptado = cipher.update(dados, "utf-8", "hex");
   encriptado += cipher.final("hex");
-  return `${iv.toString("hex")}:${encriptado}`;
+
+  const tag = cipher.getAuthTag().toString("hex");
+  return `${iv.toString("hex")}:${tag}:${encriptado}`;
 }
 
 export function descriptografar(dadosCriptografados: string): string {
   const chave = obterChaveAes();
-  const [ivHex, conteudoHex] = dadosCriptografados.split(":");
-  if (!ivHex || !conteudoHex) {
-    throw new Error("Estrutura do arquivo criptografado inválida.");
+  const partes = dadosCriptografados.split(":");
+
+  if (partes.length !== 3) {
+    throw new Error("Estrutura de arquivo criptografado inválida ou corrompida.");
   }
+
+  const [ivHex, tagHex, conteudoHex] = partes;
   const iv = Buffer.from(ivHex, "hex");
-  const decipher = crypto.createDecipheriv("aes-256-cbc", chave, iv);
+  const tag = Buffer.from(tagHex, "hex");
+
+  const decipher = crypto.createDecipheriv("aes-256-gcm", chave, iv);
+  decipher.setAuthTag(tag);
+
   let decriptado = decipher.update(conteudoHex, "hex", "utf-8");
   decriptado += decipher.final("utf-8");
+
   return decriptado;
 }
 
@@ -50,5 +61,10 @@ export function lerAtomico(caminhoArquivo: string, criptografado: boolean = fals
   if (!fs.existsSync(caminhoArquivo)) return null;
   const conteudo = fs.readFileSync(caminhoArquivo, "utf-8");
   if (!conteudo.trim()) return null;
-  return criptografado ? descriptografar(conteudo) : conteudo;
+
+  try {
+    return criptografado ? descriptografar(conteudo) : conteudo;
+  } catch (erro) {
+    throw new Error(`Falha de integridade ao ler '${path.basename(caminhoArquivo)}': arquivo corrompido ou adulterado.`);
+  }
 }

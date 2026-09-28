@@ -14,9 +14,10 @@ export class Lote extends Entidade implements Validavel {
     organizacaoId: string,
     notaFiscal: string,
     transportadora: string,
-    dataEntrada: string
+    dataEntrada: string,
+    criadoEm?: string
   ) {
-    super();
+    super(criadoEm);
     this.id = id;
     this.organizacaoId = organizacaoId;
     this.notaFiscal = notaFiscal;
@@ -60,7 +61,8 @@ export class Lote extends Entidade implements Validavel {
       dados.organizacaoId,
       dados.notaFiscal,
       dados.transportadora,
-      dados.dataEntrada
+      dados.dataEntrada,
+      dados.criadoEm
     );
   }
 }

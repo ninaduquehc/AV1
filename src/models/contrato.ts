@@ -14,9 +14,10 @@ export class Contrato extends Entidade implements Validavel {
     organizacaoId: string,
     dataInicio: string,
     dataFim: string,
-    termos: string
+    termos: string,
+    criadoEm?: string
   ) {
-    super();
+    super(criadoEm);
     this.id = id;
     this.organizacaoId = organizacaoId;
     this.dataInicio = dataInicio;
@@ -42,7 +43,7 @@ export class Contrato extends Entidade implements Validavel {
   }
 
   public resumo(): string {
-    return `Contrato ${this.id} (Org: ${this.organizacaoId}) - Vantagem: ${this.dataInicio} até ${this.dataFim}`;
+    return `Contrato ${this.id} (Org: ${this.organizacaoId}) - Vigência: ${this.dataInicio} até ${this.dataFim}`;
   }
 
   public static deJSON(dados: any, _index?: number): Contrato {
@@ -51,7 +52,8 @@ export class Contrato extends Entidade implements Validavel {
       dados.organizacaoId,
       dados.dataInicio,
       dados.dataFim,
-      dados.termos
+      dados.termos,
+      dados.criadoEm
     );
   }
 }

@@ -1,3 +1,4 @@
+import * as crypto from "crypto";
 import { Repositorio } from "../persistence/repositorio";
 import { Equipamento, EstadoFisico, HIERARQUIA_ESTADO } from "../models/equipamento";
 import { Movimentacao } from "../models/movimentacao";
@@ -9,6 +10,10 @@ import { RegraDeNegocioError } from "../models/erros";
 
 const repoEq = new Repositorio<Equipamento>(ARQ_EQUIPAMENTOS);
 const repoMov = new Repositorio<Movimentacao>(ARQ_MOVIMENTACOES);
+
+function novoIdMovimentacao(): string {
+  return `MOV-${crypto.randomUUID()}`;
+}
 
 export function executarEquipamentos(subAcao: string, opcoes: Record<string, string>, ctx: { usuario: string }): void {
   if (subAcao === "criar") {
@@ -78,7 +83,7 @@ export function executarEquipamentos(subAcao: string, opcoes: Record<string, str
     repoEq.salvar(lista);
 
     const movs = repoMov.carregar().map((m) => Movimentacao.deJSON(m));
-    movs.push(new Movimentacao(`MOV-${Date.now()}`, eq.id, ctx.usuario, statusAnterior, "em_desmonte", eq.estadoFisico, eq.estadoFisico));
+    movs.push(new Movimentacao(novoIdMovimentacao(), eq.id, ctx.usuario, statusAnterior, "em_desmonte", eq.estadoFisico, eq.estadoFisico));
     repoMov.salvar(movs);
 
     registrarTransacao(ctx.usuario, "mover_desmonte", { id: eq.id });
@@ -112,7 +117,7 @@ export function executarEquipamentos(subAcao: string, opcoes: Record<string, str
     repoEq.salvar(lista);
 
     const movs = repoMov.carregar().map((m) => Movimentacao.deJSON(m));
-    movs.push(new Movimentacao(`MOV-${Date.now()}`, eq.id, ctx.usuario, eq.status, eq.status, estadoAnterior, novoEstado, justificativa));
+    movs.push(new Movimentacao(novoIdMovimentacao(), eq.id, ctx.usuario, eq.status, eq.status, estadoAnterior, novoEstado, justificativa));
     repoMov.salvar(movs);
 
     registrarTransacao(ctx.usuario, "alterar_estado", { id: eq.id, de: estadoAnterior, para: novoEstado });

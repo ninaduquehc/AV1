@@ -1,17 +1,11 @@
-import { Validavel } from "./validavel";
+export abstract class Entidade {
+  public abstract id: string;
+  public criadoEm: string;
 
-// Classe abstrata: cada entidade define suas próprias regras (polimorfismo).
-export abstract class Entidade implements Validavel {
-  abstract readonly id: string;
-
-  protected abstract regras(): string[];
-  abstract resumo(): string;
-
-  errosDeValidacao(): string[] {
-    return this.regras();
+  constructor(criadoEmExistente?: string) {
+    this.criadoEm = criadoEmExistente || new Date().toISOString();
   }
 
-  validar(): boolean {
-    return this.regras().length === 0;
-  }
+  public abstract regras(): string[];
+  public abstract resumo(): string;
 }
