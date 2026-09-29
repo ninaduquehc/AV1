@@ -3,6 +3,7 @@ import { parseLinhaComando } from "./parser";
 import { log } from "../utils/logger";
 import { comTratamento } from "../utils/tratamento";
 import { menuGuiadoExemplo } from "./guiado";
+import { exibirEasterEgg } from "./easteregg";
 
 import { executarUsuarios } from "../commands/usuarios";
 import { executarOrganizacoes } from "../commands/organizacoes";
@@ -15,6 +16,11 @@ import { verificarEExibirHistorico } from "../commands/historico";
 
 export async function executarLinha(linha: string, ctx: { usuario: string; papel: string }): Promise<void> {
   const parsed = parseLinhaComando(linha);
+
+  if (parsed.acaoPrincipal === "wall-e") {
+    exibirEasterEgg();
+    return;
+  }
 
   if (parsed.acaoPrincipal === "ajuda") {
     console.log("\nComandos disponíveis:");
