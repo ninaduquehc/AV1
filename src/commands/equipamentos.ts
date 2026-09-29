@@ -17,19 +17,19 @@ function novoIdMovimentacao(): string {
 
 export function executarEquipamentos(subAcao: string, opcoes: Record<string, string>, ctx: { usuario: string }): void {
   if (subAcao === "criar") {
-    const id = opcoes["id"];
+    const id = opcoes["id"]; // opcional: se ausente, a fábrica gera o código de barras
     const lote = opcoes["lote"];
     const tipo = opcoes["tipo"];
     const modelo = opcoes["modelo"];
     const estado = (opcoes["estado"] || "B_BOM") as EstadoFisico;
 
-    if (!id || !lote || !tipo || !modelo) {
-      log.erro("Uso: equipamento criar --id <COD_BARRAS> --lote <LOTE_ID> --tipo <TIPO> --modelo <MODELO> [--estado ESTADO]");
+    if (!lote || !tipo || !modelo) {
+      log.erro("Uso: equipamento criar --lote <LOTE_ID> --tipo <TIPO> --modelo <MODELO> [--id COD_BARRAS] [--estado ESTADO]");
       return;
     }
 
     const lista = repoEq.carregar();
-    if (lista.some((e) => e.id === id)) {
+    if (id && lista.some((e) => e.id === id)) {
       log.erro("Já existe um equipamento cadastrado com esse código de barras.");
       return;
     }

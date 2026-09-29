@@ -24,7 +24,7 @@ export async function executarLinha(linha: string, ctx: { usuario: string; papel
     console.log("- organizacao criar --nome <NOME> --cnpj <CNPJ> --tipo <TIPO>");
     console.log("- contrato criar --org <ORG_ID> --inicio <AAAA-MM-DD> --fim <AAAA-MM-DD>");
     console.log("- lote criar --org <ORG_ID> --nf <NF> --transp <TRANSP>");
-    console.log("- equipamento criar --id <COD> --lote <LOTE> --tipo <TIPO> --modelo <MOD>");
+    console.log("- equipamento criar --lote <LOTE> --tipo <TIPO> --modelo <MOD> [--id COD] [--estado ESTADO]");
     console.log("- equipamento triar --id <COD>");
     console.log("- equipamento desmonte --id <COD>");
     console.log("- equipamento estado --id <COD> --novo <ESTADO> [--justificativa TEXTO]");
